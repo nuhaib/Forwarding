@@ -28,8 +28,7 @@ custom_url = "https://tc9987.cc/register?invite_code=0788812949052"  # URL to re
 specific_channels = {-1002094341716}  # Channels where URLs should be removed
 
 # Initialize Telegram client with optimized flood protection
-client = TelegramClient('my_account', api_id, api_hash, flood_sleep_threshold=10)
-
+client = TelegramClient('script2_session', api_id, api_hash, flood_sleep_threshold=10)
 # Store admin channels to avoid redundant API calls
 admin_channels = set()
 failed_channels = set()  # Track channels where sending fails
@@ -64,7 +63,9 @@ def process_text(text, target_id):
 
     return text.strip()
 
-@client.on(events.NewMessage(chats=source_channel_id))
+source_channel_script2 = [-1001880177414]  # Replace with Script 2's source channels
+
+@client.on(events.NewMessage(chats=source_channel_script2))
 async def forward_messages(event):
     """Handles new messages and forwards them while keeping formatting, media, buttons, and replacing URLs."""
     global admin_channels
