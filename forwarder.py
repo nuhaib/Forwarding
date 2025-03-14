@@ -1,53 +1,54 @@
+import os
 import asyncio
 from telethon import TelegramClient, events
 
-# Your Telegram credentials
-api_id = 26454923  # Replace with your actual API ID
-api_hash = 'd20b1753029d86716271b18f783b43ed'  # Replace with your actual API Hash
+# Load API credentials from environment variables
+api_id = int(os.getenv("TELEGRAM_API_ID", ""))
+api_hash = os.getenv("TELEGRAM_API_HASH", "")
+
+# Ensure credentials are set
+if not api_id or not api_hash:
+    raise ValueError("Missing API credentials. Set TELEGRAM_API_ID and TELEGRAM_API_HASH as environment variables.")
+
+# Channel IDs
 source_channel_id = -1002496657106  # Replace with actual source channel
+target_channels = [-1002389295588]  # List of target channels
 
-# Initialize the Telegram client with flood protection
+# Initialize Telegram client with flood protection
 client = TelegramClient('my_account', api_id, api_hash, flood_sleep_threshold=60)
-
-# Define the target channels where messages should be forwarded
-target_channels = [-1002389295588]
 
 @client.on(events.NewMessage(chats=source_channel_id))
 async def forward_messages(event):
-    """Forwards all messages, including premium stickers, emojis, media, and formatting."""
-    msg = event.message
-    
-    # Extract message text and media
-    message_text = msg.raw_text if msg.raw_text else None
-    media = msg.media if msg.media else None
-    reply_markup = msg.reply_markup  # Keeps buttons (if any)
-    entities = msg.entities  # Preserves formatting (bold, italic, premium emojis)
+    """Forwards all messages, preserving media, formatting, and buttons."""
+    tasks = [
+        client.send_message(
+            channel_id,
+            message=event.message.raw_text or "",
+            file=event.message.media,
+            link_preview=True,
+            buttons=event.message.reply_markup,
+            formatting_entities=event.message.entities
+        )
+        for channel_id in target_channels
+    ]
 
-    # Forward the message to all target channels
-    tasks = []
-    for channel_id in target_channels:
-        try:
-            tasks.append(
-                client.send_message(
-                    entity=channel_id,
-                    message=message_text,  # Use cleaned-up message text
-                    file=media,  # Keeps media
-                    link_preview=True,  # Enables URL previews
-                    buttons=reply_markup,  # Keeps inline buttons
-                    formatting_entities=entities,  # Ensures premium emojis are forwarded correctly
-                )
-            )
-        except Exception as e:
-            print(f"Failed to forward message to {channel_id}: {e}")
+    results = await asyncio.gather(*tasks, return_exceptions=True)
 
-    # Send all messages asynchronously
-    await asyncio.gather(*tasks, return_exceptions=True)
+    for channel_id, result in zip(target_channels, results):
+        if isinstance(result, Exception):
+            print(f"Failed to forward message to {channel_id}: {result}")
 
 async def main():
-    await client.start()
-    print("Forwarder is running...")
-    await client.run_until_disconnected()
+    """Starts the Telegram client and runs until disconnected."""
+    try:
+        await client.start()
+        print("Forwarder is running...")
+        await client.run_until_disconnected()
+    except KeyboardInterrupt:
+        print("Shutting down gracefully...")
+    finally:
+        await client.disconnect()
 
-# Run the bot
-if __name__ == "__main__":  
-    client.loop.run_until_complete(main())
+# Run the bot using asyncio.run() to prevent nested loops
+if __name__ == "__main__":
+    asyncio.run(main())
